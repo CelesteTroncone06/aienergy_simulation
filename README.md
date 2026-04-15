@@ -2,7 +2,7 @@
 
 Analysis code accompanying the Joule manuscript:
 
-Felipe Oviedo et al., *Energy Use of AI Inference, Efficiency Pathways, and Test-Time Scaling*.
+Felipe Oviedo et al., *Energy Use of AI Inference, Efficiency Pathways, and Test-Time Scaling*, Joule, 2026
 
 ## Set-up environment
 
