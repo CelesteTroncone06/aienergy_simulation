@@ -1,0 +1,26 @@
+﻿Model,Total Parameter Count (B),Active Parameter Count (B),Type (Dense / MoE),Hardware,Scaled Power,TP Size,Quantization,Tokens per Second (TPS),Input Length,Output Length,Batch Size,Power for Node (kW),Source,Comments,Confidence level
+Mixtral 8x22B,141,22,MoE,H100 80GB HBM3,No,8,FP16,1177.80,Variable,385.22,255.35,11,ml.energy-chat-results,"Average batch size, quantization to be confirmed",Medium
+Mistral Large,123,NA,Dense,H100 80GB HBM3,No,8,FP16,1159.78,Variable,510.32,255.5,11,ml.energy-chat-results,"Average batch size, quantization to be confirmed",Medium
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP16,579.63,Variable,449.8,127.41,11,ml.energy-chat-results,"Average batch size, quantization to be confirmed",Medium
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,3732.40,128,128,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,448.89,2048,128,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,579.14,5000,500,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,3661.85,500,2000,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,4572.23,128,2048,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 70B,70,NA,Dense,H100 80GB HBM3,No,8,FP8,14686.01,128,128,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 70B,70,NA,Dense,H100 80GB HBM3,No,8,FP8,17463.99,128,2048,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 70B,70,NA,Dense,H100 80GB HBM3,No,8,FP8,1840.12,2048,128,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 70B,70,NA,Dense,H100 80GB HBM3,No,8,FP8,2399.78,5000,500,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Llama 3.1 70B,70,NA,Dense,H100 80GB HBM3,No,8,FP8,14630.41,500,2000,Dynamic,11,tensorRT-LLM-May2025,v019,High
+Mixtral 8x22B,141,22,MoE,H100 80GB HBM3,No,8,FP8,21876.08,128,128,Dynamic,11,tensorRT-LLM-Feb2025,v017,High
+Mixtral 8x22B,141,22,MoE,H100 80GB HBM3,No,8,FP8,25150.03,128,2048,Dynamic,11,tensorRT-LLM-Feb2025,v017,High
+Mixtral 8x22B,141,22,MoE,H100 80GB HBM3,No,8,FP8,2794.97,2048,128,Dynamic,11,tensorRT-LLM-Feb2025,v017,High
+Mixtral 8x22B,141,22,MoE,H100 80GB HBM3,No,8,FP8,21421.86,500,2000,Dynamic,11,tensorRT-LLM-Feb2025,v017,High
+Mixtral 8x22B,141,22,MoE,H100 80GB HBM3,No,8,FP8,3645.27,5000,500,Dynamic,11,tensorRT-LLM-Feb2025,v017,High
+DeepSeek-R1,671,37,MoE,2xH100 80GB HBM3,Yes,8,FP8,886.00,1024,1024,Dynamic,14.3,tensorRT-LLM-DeepSeekR1,"Based on figure, maximizing throughput, 2xH100s, normalized to 8 H100s… maybe increase power (!)",Medium
+Llama-3.1 Nemotron Ultra 253B,235,NA,Dense,H100 80GB HBM3,No,8,FP8,5200.00,500,2000,250,11,llamaNemotron,Figure 4 in work,Medium
+Llama-3.1 Nemotron Ultra 253B,235,NA,Dense,H100 80GB HBM3,No,8,FP8,720.00,5000,500,250,11,llamaNemotron,Figure 4 in work,Medium
+DeepSeek-R1,671,37,MoE,H200 140GB HBM3,Yes,8,FP8,1300.00,500,2000,250,14.3,llamaNemotron,"Figure 4 in work, noted it cannot be served on H100 node",Medium
+DeepSeek-R1,671,37,MoE,H200 140GB HBM3,Yes,8,FP8,378.00,5000,500,250,14.3,llamaNemotron,"Figure 4 in work, noted it cannot be served on H100 node",Medium
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,2050.00,500,2000,250,11,llamaNemotron,Figure 4 in work,Medium
+Llama 3.1 405B,405,NA,Dense,H100 80GB HBM3,No,8,FP8,480.00,5000,500,250,11,llamaNemotron,Figure 4 in work,Medium

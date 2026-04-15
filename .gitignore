@@ -1,0 +1,15 @@
+*.docx
+*.pdf
+*.txt
+*.svg
+*.png
+.DS_Store
+*.csv
+*.xlsx
+*.tif
+*.ai
+manuscript_figures
+*.csv
+.venv/
+list/
+!model_throughput_DB.csv
