@@ -19,7 +19,9 @@ PARAMETER ALIGNMENT WITH estimate_per_mode_regression.py:
    - Figure size: (10, 8) (was (15, 8) for fig1, (12, 10) for fig2)
    - Seaborn font scale: 2.5 (was 1.8)
    - All legend and tick font sizes updated to match
-   
+
+---------------------------------------------------------------------
+
 This script estimates energy consumption per query for open-weight
 language models running on H100 GPUs in the traditional-query regime.
 
