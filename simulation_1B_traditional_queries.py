@@ -1,4 +1,4 @@
-#%%
+
 """
 PARAMETER ALIGNMENT WITH estimate_per_mode_regression.py:
 
@@ -20,13 +20,29 @@ PARAMETER ALIGNMENT WITH estimate_per_mode_regression.py:
    - Figure size: (10, 8) (was (15, 8) for fig1, (12, 10) for fig2)
    - Seaborn font scale: 2.5 (was 1.8)
    - All legend and tick font sizes updated to match
+   
+This script estimates energy consumption per query for open-weight
+language models running on H100 GPUs in the traditional-query regime.
+
+The simulation uses Monte Carlo sampling to estimate the distribution
+of energy per query, accounting for variability in model throughput,
+query characteristics and system efficiency.
+
+Inputs:
+- model_throughput_DB.csv: throughput data for different models
+
+Outputs:
+- Energy per query estimates
+- Figures corresponding to the traditional-query analysis
 """
 
-import numpy as np
+
+import numpy as np # numerical operations and random sampling
 import matplotlib.pyplot as plt
-import pandas as pd
-import seaborn as sns
+import pandas as pd # loads and processes model throughput data
+import seaborn as sns # statistical data visualisation
 import matplotlib
+# linear regression model for TPS/throughput
 from sklearn.linear_model import LinearRegression
 
 # Set larger font sizes globally for all figures
@@ -53,10 +69,18 @@ print(model_throughput.columns)
 
 # Drop those with Quantization != "FP8"
 model_throughput = model_throughput[model_throughput['Quantization'] == 'FP8']
+# dropped models that do not use FP8 as the authors assume FP8, balances
+# memory and speed
 
 #%%
 # Helper function to get log-normal parameters from (5th, 95th percentile)
 def lognorm_params(min_val, max_val):
+    # Convert minimum and maximum values into parameters of a log-normal
+    # distribution. The method assumes that min_val and max_val represent
+    # approximately the 5th and 95th percentiles of the distribution.
+    # 1.645 is the 95th percentile of a standard normal distribution.
+    # For a normal distribution, ~90% of values lie between
+    # mean - 1.645*sigma and mean + 1.645*sigma
     sigma = (np.log(max_val) - np.log(min_val)) / (2 * 1.645)
     mu = np.log(min_val) + 1.645 * sigma
     return mu, sigma
@@ -172,8 +196,8 @@ def predict_tps_for_lengths(model_name, input_length, output_length, regression_
 # Build regression models
 tps_regression_models, interpolation_models, max_tps_values = create_tps_regression_models(model_throughput)
 
-# Simulation settings
-n_runs = 10000
+# Simulation settings --- CHANGE THESE ---
+n_runs = 10000 # n_runs is large to simulate stochastic query lengths for Monte Carlo
 median_tokens = 300   # median tokens query length
 fixed_input_length = 500  # Fixed input length for predictions
 # Calculate lambda parameter for exponential distribution to achieve desired median
@@ -183,8 +207,8 @@ lambda_param = np.log(2) / median_tokens  # For exponential, median = ln(2)/λ
 def get_node_power(model_name):
     return 12.8 if model_name == 'DeepSeek-R1' else 10.2
 
-pu_range = (0.4, 0.9)        # for lognormal
-PUE_range = (1.05, 1.6)       # for lognormal
+pu_range = (0.4, 0.9)        # for lognormal, as 0.7Pmax is where it is centred
+PUE_range = (1.05, 1.6)       # for lognormal, as PUE ranges between those values
 
 # Compute log-normal parameters where needed
 mu_pu, sigma_pu = lognorm_params(*pu_range)
@@ -803,6 +827,23 @@ print(f"Original improved serving sum: {improved_sum_kwh:.2f} kWh")
 
 # Bootstrap function
 def bootstrap_energy_estimate(energies, label, n_bootstrap=1000):
+    """
+    Estimate uncertainty in total energy consumption using bootstrap sampling.
+
+    The function repeatedly resamples simulated energy-per-query values
+    to estimate the distribution of total energy required for 1 billion
+    queries. Percentile-based confidence intervals are then calculated.
+
+    Parameters:
+    - energies: simulated energy consumption values (Wh/query)
+    - label: description used in printed output
+    - n_bootstrap: number of bootstrap samples
+
+    Returns:
+    - Median energy estimate (GWh)
+    - 5th, 25th, 75th and 95th percentile estimates
+    """
+    
     print(f"\nBootstrap confidence intervals for {label}:")
     np.random.seed(42)
     
