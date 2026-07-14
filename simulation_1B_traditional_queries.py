@@ -1,4 +1,3 @@
-
 """
 PARAMETER ALIGNMENT WITH estimate_per_mode_regression.py:
 
@@ -35,7 +34,6 @@ Outputs:
 - Energy per query estimates
 - Figures corresponding to the traditional-query analysis
 """
-
 
 import numpy as np # numerical operations and random sampling
 import matplotlib.pyplot as plt
