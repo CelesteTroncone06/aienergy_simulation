@@ -20,6 +20,8 @@ PARAMETER ALIGNMENT WITH estimate_per_mode_regression.py:
    - Seaborn font scale: 2.5 (was 1.8)
    - All legend and tick font sizes updated to match
    
+--------------------------------------------------------------------------
+
 This script estimates energy consumption per query for open-weight
 language models running on H100 GPUs in the traditional-query regime.
 
@@ -73,18 +75,29 @@ model_throughput = model_throughput[model_throughput['Quantization'] == 'FP8']
 #%%
 # Helper function to get log-normal parameters from (5th, 95th percentile)
 def lognorm_params(min_val, max_val):
-    # Convert minimum and maximum values into parameters of a log-normal
-    # distribution. The method assumes that min_val and max_val represent
-    # approximately the 5th and 95th percentiles of the distribution.
-    # 1.645 is the 95th percentile of a standard normal distribution.
-    # For a normal distribution, ~90% of values lie between
-    # mean - 1.645*sigma and mean + 1.645*sigma
+    """
+    Calculates parameters for a log-normal distribution.
+    
+    The uncertainty range is defined using the 5th and 95th percentiles.
+    The value 1.645 corresponds to the 95% confidence interval of a
+    standard normal distribution.
+    
+    Convert minimum and maximum values into parameters of a log-normal
+    distribution. The method assumes that min_val and max_val represent
+    approximately the 5th and 95th percentiles of the distribution.1.645 is
+    the 95th percentile of a standard normal distribution. For a normal 
+    distribution, ~90% of values lie between mean - 1.645*sigma and mean
+    + 1.645*sigma. 
+    """
     sigma = (np.log(max_val) - np.log(min_val)) / (2 * 1.645)
     mu = np.log(min_val) + 1.645 * sigma
     return mu, sigma
 
 def create_tps_regression_models(model_data):
-    """Create regression models for each model to predict TPS from input/output lengths"""
+    """
+    Create regression models for each model to predict TPS (throughout/
+    tokens per second) from input/output lengths.
+    """
     regression_models = {}
     interpolation_models = {}
     max_tps_values = {}  # Store maximum TPS for each model
@@ -102,7 +115,7 @@ def create_tps_regression_models(model_data):
     for model_name in model_data['Model'].unique():
         model_subset = model_data[model_data['Model'] == model_name].copy()
         
-        # Remove any rows with NaN values
+        # Remove any rows with NaN values as it will cause a NaN error
         model_subset = model_subset.dropna(subset=['Input_Length_numeric', 'Output_Length_numeric', 'TPS_numeric'])
         
         if len(model_subset) < 2:  # Need at least 2 points for interpolation
@@ -163,7 +176,11 @@ def create_tps_regression_models(model_data):
     return regression_models, interpolation_models, max_tps_values
 
 def predict_tps_for_lengths(model_name, input_length, output_length, regression_models, interpolation_models, max_tps_values):
-    """Predict TPS for given input and output lengths using regression or interpolation, capped at max observed TPS"""
+    """
+    Predict TPS for given input and output lengths using regression or 
+    interpolation, capped at max observed TPS. Capped at TPS as it plateaus at
+    a certain point.
+    """
     
     # Try regression first
     if model_name in regression_models:
@@ -194,19 +211,22 @@ def predict_tps_for_lengths(model_name, input_length, output_length, regression_
 # Build regression models
 tps_regression_models, interpolation_models, max_tps_values = create_tps_regression_models(model_throughput)
 
-# Simulation settings --- CHANGE THESE ---
+# Simulation settings --- CHANGE THESE TO CHECK WHAT THEY DO---
 n_runs = 10000 # n_runs is large to simulate stochastic query lengths for Monte Carlo
 median_tokens = 300   # median tokens query length
 fixed_input_length = 500  # Fixed input length for predictions
 # Calculate lambda parameter for exponential distribution to achieve desired median
 lambda_param = np.log(2) / median_tokens  # For exponential, median = ln(2)/λ
 
-# Define ranges and values
+# Define ranges and values, node power known from benchmark industry values
 def get_node_power(model_name):
     return 12.8 if model_name == 'DeepSeek-R1' else 10.2
 
 pu_range = (0.4, 0.9)        # for lognormal, as 0.7Pmax is where it is centred
 PUE_range = (1.05, 1.6)       # for lognormal, as PUE ranges between those values
+
+# Power Usage Effectiveness (PUE) accounts for additional data centre
+# energy overhead such as cooling and power distribution losses.
 
 # Compute log-normal parameters where needed
 mu_pu, sigma_pu = lognorm_params(*pu_range)
@@ -254,9 +274,12 @@ for model_name in all_tps_models.keys():
     
     # Calculate base energies for this model
     model_energies = np.empty(n_runs)
+    
+    # Energy per query is calculated by dividing server power consumption
+    # by the number of queries processed per second (throughput).
     for i in range(n_runs):
         energy_kj = model_pue[i] * (model_node_power_array[i] * model_pu[i] * model_token_lengths[i]) / model_tokens_per_sec[i]
-        model_energies[i] = (energy_kj / 3600) * 1000
+        model_energies[i] = (energy_kj / 3600) * 1000 # Converts energies from Joule to Watts
     
     all_model_energies[model_name] = model_energies
     print(f"  Generated {n_runs} energy samples")
@@ -269,6 +292,8 @@ for model_name, energies in all_model_energies.items():
         p5, p95 = np.percentile(energies, [5, 95])
         filtered_energies = energies[(energies >= p5) & (energies <= p95)]  # Changed to inclusive bounds
         
+        # Save final energy estimates so they can be used to reproduce
+        # figures and further analysis in the manuscript.
         df_model = pd.DataFrame({
             'Energy (Wh)': filtered_energies,
             'Model': model_name
@@ -344,7 +369,7 @@ ax.legend(handles=legend_elements, frameon=True, facecolor='white',
          edgecolor='none', loc='lower right', bbox_to_anchor=(1, 0),
          fontsize=12)
 
-# Customize the plot
+# Customize the plot, THIS IS THE VIOLIN PLOT FOR PER QUERY
 plt.title('Per Query Energy Consumption (P5-P95)', fontsize=14, pad=20)
 plt.xlabel('Energy per Query (Wh)', fontsize=12)
 plt.grid(True, alpha=0.3)
@@ -528,6 +553,7 @@ for model_name in top_3_models:
 mixed_energies = np.array(mixed_energies)
 
 # Add improvement pathways using the same logic as fig1.py
+# This is the data with line-of-sight improvements applied
 print("\n" + "="*40)
 print("APPLYING IMPROVEMENT PATHWAYS")
 print("="*40)
@@ -595,7 +621,8 @@ colors = {
 plt.style.use('default')  
 plt.figure(figsize=(10, 8))
 
-# Create violin plot with same parameters as Figure 1
+# Create violin plot with same parameters as Figure 1, this is the second violin
+# plot with line-of-sight improvements
 ax = sns.violinplot(data=plot_data_all, 
                     x='Energy (Wh)', 
                     y='Distribution',
@@ -849,6 +876,7 @@ def bootstrap_energy_estimate(energies, label, n_bootstrap=1000):
     scaling_factor = 1_000_000_000 / len(energies)
     
     for i in range(n_bootstrap):
+        # random variable ensures monte carlo
         bootstrap_sample = np.random.choice(energies, size=len(energies), replace=True)
         bootstrap_sum_kwh = np.sum(bootstrap_sample) / 1000
         bootstrap_scaled_kwh = bootstrap_sum_kwh * scaling_factor
@@ -892,7 +920,14 @@ ci5_errors = [baseline_median - baseline_ci5, improved_median - improved_ci5]
 ci95_errors = [baseline_ci95 - baseline_median, improved_ci95 - improved_median]
 
 # Multiply by 2x to account for orchestration, backup, etc.
-fuzz_factor = 1.10*1.076*1.12
+# This ensures that other factors are taken into account in the energy
+# per query calculation.
+
+# Empirical correction factor that adjusts the
+# theoretical energy estimate to better reflect measured real-world
+# system performance. It combines several multiplicative overheads
+# reported by the authors.
+fuzz_factor = 1.10*1.076*1.12 
 medians = [median * fuzz_factor for median in medians]
 ci5_errors = [ci5 * fuzz_factor for ci5 in ci5_errors]
 ci95_errors = [ci95 * fuzz_factor for ci95 in ci95_errors]
