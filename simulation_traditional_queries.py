@@ -1,3 +1,19 @@
+"""
+This script estimates energy consumption per query for open-weight
+language models running on H100 GPUs in the traditional-query regime.
+
+The simulation uses Monte Carlo sampling to estimate the distribution
+of energy per query, accounting for variability in model throughput,
+query characteristics and system efficiency.
+
+Inputs:
+- model_throughput_DB.csv: throughput data for different models
+
+Outputs:
+- Energy per query estimates
+- Figures corresponding to the traditional-query analysis
+"""
+
 #%%
 import numpy as np
 import matplotlib.pyplot as plt
@@ -29,17 +45,36 @@ model_throughput = pd.read_csv('model_throughput_DB.csv')
 print(model_throughput.columns)
 
 # Drop those with Quantization != "FP8"
+# Paper for traditional queries makes the assumption that we are working with 
+# FP8, balances memory and speed.
 model_throughput = model_throughput[model_throughput['Quantization'] == 'FP8']
 
 #%%
 # Helper function to get log-normal parameters from (5th, 95th percentile)
 def lognorm_params(min_val, max_val):
+    """
+    Calculates parameters for a log-normal distribution.
+    
+    The uncertainty range is defined using the 5th and 95th percentiles.
+    The value 1.645 corresponds to the 95% confidence interval of a
+    standard normal distribution.
+    
+    Convert minimum and maximum values into parameters of a log-normal
+    distribution. The method assumes that min_val and max_val represent
+    approximately the 5th and 95th percentiles of the distribution.1.645 is
+    the 95th percentile of a standard normal distribution. For a normal 
+    distribution, ~90% of values lie between mean - 1.645*sigma and mean
+    + 1.645*sigma. 
+    """
     sigma = (np.log(max_val) - np.log(min_val)) / (2 * 1.645)
     mu = np.log(min_val) + 1.645 * sigma
     return mu, sigma
 
 def create_tps_regression_models(model_data):
-    """Create regression models for each model to predict TPS from input/output lengths"""
+    """
+    Create regression models for each model to predict TPS from 
+    input/output lengths
+    """
     regression_models = {}
     interpolation_models = {}
     max_tps_values = {}  # Store maximum TPS for each model
@@ -118,7 +153,10 @@ def create_tps_regression_models(model_data):
     return regression_models, interpolation_models, max_tps_values
 
 def predict_tps_for_lengths(model_name, input_length, output_length, regression_models, interpolation_models, max_tps_values):
-    """Predict TPS for given input and output lengths using regression or interpolation, capped at max observed TPS"""
+    """
+    Predict TPS for given input and output lengths using regression 
+    or interpolation, capped at max observed TPS
+    """
     
     # Try regression first
     if model_name in regression_models:
@@ -149,19 +187,25 @@ def predict_tps_for_lengths(model_name, input_length, output_length, regression_
 # Build regression models
 tps_regression_models, interpolation_models, max_tps_values = create_tps_regression_models(model_throughput)
 
-# Simulation settings
-n_runs = 10000
-median_tokens = 300   # median tokens query length
-fixed_input_length = 500  # Fixed input length for predictions
+# Simulation settings --- THESE ARE THE ONES TO CHANGE
+n_runs = 10000 # large number of repeats so allows for statistical calculations
+median_output_tokens = 300   # Median of the exponential distribution used to randomly sample input prompt lengths.
+fixed_input_length = 300  # Constant prompt length supplied to the TPS regression model when predicting throughput.
 # Calculate lambda parameter for exponential distribution to achieve desired median
-lambda_param = np.log(2) / median_tokens  # For exponential, median = ln(2)/λ
+lambda_param = np.log(2) / median_output_tokens  # For exponential, median = ln(2)/λ
 
 # Define ranges and values
 def get_node_power(model_name):
+    """
+    Node power from table of values.
+    """
     return 12.8 if model_name == 'DeepSeek-R1' else 10.2
 
-pu_range = (0.4, 0.9)        # for lognormal
-PUE_range = (1.05, 1.6)       # for lognormal
+pu_range = (0.4, 0.9)        # for lognormal, as 0.7Pmax is where it is centred
+PUE_range = (1.05, 1.6)       # for lognormal, as PUE ranges between those values
+
+# Power Usage Effectiveness (PUE) accounts for additional data centre
+# energy overhead such as cooling and power distribution losses.
 
 # Compute log-normal parameters where needed
 mu_pu, sigma_pu = lognorm_params(*pu_range)
@@ -183,9 +227,14 @@ for model_name in all_tps_models.keys():
     node_power = get_node_power(model_name)
     
     # Generate random output token lengths (exponential distribution)
+    # Generate random output response lengths from an exponential distribution.
+    # The distribution is parameterised so that the median generated response
+    # contains 'median_output_tokens' tokens.
     model_token_lengths = np.round(np.random.exponential(1/lambda_param, n_runs)).astype(int)
     
-    # Predict TPS for each token length using regression or interpolation
+    # Estimate throughput for each simulated query.
+    # The input prompt length is held constant (300 tokens), while the
+    # generated response length varies between Monte Carlo samples.
     model_tokens_per_sec = np.array([
         predict_tps_for_lengths(model_name, fixed_input_length, token_length, tps_regression_models, interpolation_models, max_tps_values)
         for token_length in model_token_lengths
@@ -209,9 +258,12 @@ for model_name in all_tps_models.keys():
     
     # Calculate base energies for this model
     model_energies = np.empty(n_runs)
+    
+    # Energy per query is calculated by dividing server power consumption
+    # by the number of queries processed per second (throughput).
     for i in range(n_runs):
         energy_kj = model_pue[i] * (model_node_power_array[i] * model_pu[i] * (model_token_lengths[i])) / model_tokens_per_sec[i]
-        model_energies[i] = (energy_kj / 3600) * 1000
+        model_energies[i] = (energy_kj / 3600) * 1000 # conversion factor from kj to Wh
     
     all_model_energies[model_name] = model_energies
     print(f"  Generated {n_runs} energy samples")
@@ -395,7 +447,7 @@ print("\n" + "="*60)
 print("TPS MODEL SUMMARY")
 print("="*60)
 print(f"Fixed Input Length Used: {fixed_input_length} tokens")
-print(f"Output Length Distribution: Exponential (median = {median_tokens} tokens)")
+print(f"Output Length Distribution: Exponential (median = {median_output_tokens} tokens)")
 print()
 
 # Print regression models first
@@ -779,7 +831,7 @@ print("="*60)
 
 print(f"Distribution parameters:")
 print(f"  Type: Exponential")
-print(f"  Median: {median_tokens} tokens")
+print(f"  Median: {median_output_tokens} tokens")
 print(f"  Lambda parameter: {lambda_param:.6f}")
 print(f"  Number of samples: {n_runs:,}")
 
