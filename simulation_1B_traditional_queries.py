@@ -19,13 +19,8 @@ PARAMETER ALIGNMENT WITH estimate_per_mode_regression.py:
    - Figure size: (10, 8) (was (15, 8) for fig1, (12, 10) for fig2)
    - Seaborn font scale: 2.5 (was 1.8)
    - All legend and tick font sizes updated to match
-<<<<<<< HEAD
-   
---------------------------------------------------------------------------
-=======
 
----------------------------------------------------------------------
->>>>>>> bf8fb4f1308b6c59f1af54f1031fe3ef8fccfa83
+----------------------------------------------------------------------------
 
 This script estimates energy consumption per query for open-weight
 language models running on H100 GPUs in the traditional-query regime.
@@ -218,17 +213,17 @@ tps_regression_models, interpolation_models, max_tps_values = create_tps_regress
 
 # Simulation settings --- CHANGE THESE TO CHECK WHAT THEY DO---
 n_runs = 10000 # n_runs is large to simulate stochastic query lengths for Monte Carlo
-median_tokens = 300   # median tokens query length
+median_output_tokens = 300   # median tokens query length
 fixed_input_length = 500  # Fixed input length for predictions
 # Calculate lambda parameter for exponential distribution to achieve desired median
-lambda_param = np.log(2) / median_tokens  # For exponential, median = ln(2)/λ
+lambda_param = np.log(2) / median_output_tokens  # For exponential, median = ln(2)/λ
 
 # Define ranges and values, node power known from benchmark industry values
 def get_node_power(model_name):
     return 12.8 if model_name == 'DeepSeek-R1' else 10.2
 
-pu_range = (0.4, 0.9)        # for lognormal, as 0.7Pmax is where it is centred
-PUE_range = (1.05, 1.6)       # for lognormal, as PUE ranges between those values
+pu_range = (0.4, 0.7)        # for lognormal, as 0.7Pmax is where it is centred
+PUE_range = (1.5, 2)       # for lognormal, as PUE ranges between those values
 
 # Power Usage Effectiveness (PUE) accounts for additional data centre
 # energy overhead such as cooling and power distribution losses.
@@ -435,7 +430,7 @@ print("\n" + "="*60)
 print("TPS MODEL SUMMARY")
 print("="*60)
 print(f"Fixed Input Length Used: {fixed_input_length} tokens")
-print(f"Output Length Distribution: Exponential (median = {median_tokens} tokens)")
+print(f"Output Length Distribution: Exponential (median = {median_output_tokens} tokens)")
 print()
 
 # Print regression models first
@@ -745,7 +740,7 @@ print("="*60)
 
 print(f"Distribution parameters:")
 print(f"  Type: Exponential")
-print(f"  Median: {median_tokens} tokens")
+print(f"  Median: {median_output_tokens} tokens")
 print(f"  Lambda parameter: {lambda_param:.6f}")
 print(f"  Number of samples: {n_runs:,}")
 
@@ -992,7 +987,7 @@ print("="*60)
 
 print("Calculating total tokens for 1 billion queries using existing sample...")
 print(f"Parameters:")
-print(f"  Median output tokens per query: {median_tokens}")
+print(f"  Median output tokens per query: {median_output_tokens}")
 print(f"  Fixed input tokens per query: {fixed_input_length}")
 print(f"  Sample size: {len(model_token_lengths):,}")
 
