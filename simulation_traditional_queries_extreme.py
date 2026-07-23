@@ -189,10 +189,10 @@ tps_regression_models, interpolation_models, max_tps_values = create_tps_regress
 
 # Simulation settings --- THESE ARE THE ONES TO CHANGE
 n_runs = 10000 # large number of repeats so allows for statistical calculations
-mean_output_tokens = 433   # Mean of the exponential distribution used to randomly sample input prompt lengths.
+median_output_tokens = 300   # Median of the exponential distribution used to randomly sample input prompt lengths.
 fixed_input_length = 300  # Constant prompt length supplied to the TPS regression model when predicting throughput.
 # Calculate lambda parameter for exponential distribution to achieve desired median
-lambda_param = 1 / mean_output_tokens  # For exponential, mean = 1/λ
+lambda_param = np.log(2) / median_output_tokens  # For exponential, median = ln(2)/λ
 
 # Define ranges and values
 def get_node_power(model_name):
@@ -447,7 +447,7 @@ print("\n" + "="*60)
 print("TPS MODEL SUMMARY")
 print("="*60)
 print(f"Fixed Input Length Used: {fixed_input_length} tokens")
-print(f"Output Length Distribution: Exponential (mean = {mean_output_tokens} tokens)")
+print(f"Output Length Distribution: Exponential (median = {median_output_tokens} tokens)")
 print()
 
 # Print regression models first
