@@ -190,7 +190,7 @@ tps_regression_models, interpolation_models, max_tps_values = create_tps_regress
 # Simulation settings --- THESE ARE THE ONES TO CHANGE
 n_runs = 10000 # large number of repeats so allows for statistical calculations
 median_output_tokens = 300   # Median of the exponential distribution used to randomly sample input prompt lengths.
-fixed_input_length = 300  # Constant prompt length supplied to the TPS regression model when predicting throughput.
+fixed_input_length = 500  # Constant prompt length supplied to the TPS regression model when predicting throughput.
 # Calculate lambda parameter for exponential distribution to achieve desired median
 lambda_param = np.log(2) / median_output_tokens  # For exponential, median = ln(2)/λ
 
@@ -221,8 +221,6 @@ print("=" * 50)
 all_tps_models = {**tps_regression_models, **interpolation_models}
 
 for model_name in all_tps_models.keys():
-    print(f"Processing {model_name}...")
-    
     # Get model-specific node power
     node_power = get_node_power(model_name)
     
@@ -266,7 +264,6 @@ for model_name in all_tps_models.keys():
         model_energies[i] = (energy_kj / 3600) * 1000 # conversion factor from kj to Wh
     
     all_model_energies[model_name] = model_energies
-    print(f"  Generated {n_runs} energy samples")
 
 # Rename the key in all_model_energies and all_model_tps to match the renamed model label
 if 'DeepSeek-R1' in all_model_energies:
@@ -480,33 +477,6 @@ for model_name in sorted(interpolation_models.keys()):
     print(f"  Using TPS: {model_info['max_tps']:.0f} (max value)")
     print()
 
-if max_tps_models_found:
-    print(f"Max TPS models: {len(interpolation_models)}")
-
-print(f"Total models processed: {len(all_tps_models)}")
-# Print mean of the token output length
-print(f"Mean of the token output length: {np.mean(model_token_lengths)}")
-print(f"Std of the token output length: {np.std(model_token_lengths)}")
-# Print Q1 and Q3 of the token output length
-print(f"Q1 of the token output length: {np.percentile(model_token_lengths, 25)}")
-print(f"Q3 of the token output length: {np.percentile(model_token_lengths, 75)}")
-# Print P5 and P95 of the token output length
-print(f"P5 of the token output length: {np.percentile(model_token_lengths, 5)}")
-print(f"P95 of the token output length: {np.percentile(model_token_lengths, 95)}")
-# Print mean of the token output length
-print(f"Mean of the token output length: {np.mean(model_token_lengths)}")
-# Print std of the token output length
-print(f"Std of the token output length: {np.std(model_token_lengths)}")
-print(f"Max of the token output length: {np.max(model_token_lengths)}")
-print(f"Min of the token output length: {np.min(model_token_lengths)}")
-# %%
-
-#%%
-# Figure 2: Mixed distribution of top 3 models (by highest median energy consumption)
-print("\n" + "="*60)
-print("FIGURE 2: TOP 3 MOST ENERGY INTENSIVE MODELS MIXED DISTRIBUTION")
-print("="*60)
-
 # Calculate median energy for each model to determine top 3
 model_medians = {}
 for model_name in model_order:
@@ -653,13 +623,48 @@ distribution_names = ['Baseline', 'Model', 'Serving \nPlatform', 'Hardware \n& D
 energies_list = [mixed_energies, algorithm_energies, improved_energies, hardware_energies]
 
 for i, (dist_name, energies) in enumerate(zip(distribution_names, energies_list)):
-    # Get quartiles from the actual data being plotted
+    # Calculate statistics
     p25, p50, p75 = np.percentile(energies, [25, 50, 75])
-    # Add lines at each quartile (EXACT SAME AS FIGURE 1)
-    ax.hlines(y=i, xmin=p25, xmax=p75, color='black', linewidth=2, alpha=0.7)  # IQR line
-    ax.vlines(x=p50, ymin=i-0.1, ymax=i+0.1, color='white', linewidth=3)  # Median line
-    ax.vlines(x=p50, ymin=i-0.1, ymax=i+0.1, color='black', linewidth=2)  # Median line border
+    mean_energy = np.mean(energies)
 
+    # IQR line
+    ax.hlines(
+        y=i,
+        xmin=p25,
+        xmax=p75,
+        color='black',
+        linewidth=2,
+        alpha=0.7
+    )
+
+    # Median tick (black)
+    ax.vlines(
+        x=p50,
+        ymin=i-0.10,
+        ymax=i+0.10,
+        color='white',
+        linewidth=3,
+        zorder=5
+    )
+    ax.vlines(
+        x=p50,
+        ymin=i-0.10,
+        ymax=i+0.10,
+        color='black',
+        linewidth=2,
+        zorder=6
+    )
+
+    # Mean tick (red dashed)
+    ax.vlines(
+        x=mean_energy,
+        ymin=i-0.15,
+        ymax=i+0.15,
+        color='red',
+        linestyle='--',
+        linewidth=2,
+        zorder=7
+    )
 # Remove any whisker lines that might remain (SAME AS FIGURE 1)
 for artist in ax.get_children():
     if isinstance(artist, matplotlib.lines.Line2D):
@@ -677,13 +682,21 @@ for category, energies in [
     # Use the same energies that are actually plotted (no additional filtering)
     p25, p50, p75 = np.percentile(energies, [25, 50, 75])
     legend_elements.append(plt.Line2D([0], [0], color=colors[category], 
-                         label=f'{category.replace(chr(10), " ")}: {p50:.2f} Wh (IQR:{p25:.2f}-{p75:.2f})', 
-                         linewidth=2))
+                         label=(
+    f'{category.replace(chr(10), " ")}: '
+    f'Mean={p50/np.log(2):.2f} Wh '
+    f'(Median={p50:.2f} Wh, '
+    f'IQR={p25:.2f}–{p75:.2f} Wh)'
+)))
+
+print(f"Median energy: {np.median(mixed_energies):.3f}")
+print(f"Empirical mean energy: {np.mean(mixed_energies):.3f}")
+print(f"Median / ln(2): {np.median(mixed_energies)/np.log(2):.3f}")
 
 # Add legend with same styling as Figure 1
 ax.legend(handles=legend_elements, frameon=True, facecolor='white', 
          edgecolor='none', loc='lower right', bbox_to_anchor=(1, 0),
-         fontsize=12)  # Same as Figure 1
+         fontsize=10)  # Same as Figure 1
 
 # Customize the plot (matching Figure 1 styling)
 plt.title(f'Energy Distribution with Line-of-Sight Improvements (P5-P95) \nBaseline: Blend of Models >200B parameters)', 
@@ -712,202 +725,3 @@ plt.savefig('manuscript_figures/updated_figures/figure2_energy_improvement_pathw
 
 # Show the plot
 plt.show()
-
-
-
-
-# Print statistics for all distributions (using same data as plotted)
-print(f"\nDistribution Statistics (same data as plotted):")
-print("="*60)
-
-for category, energies in [
-    ('Baseline (Mixed Top 3)', mixed_energies),
-    ('Model', algorithm_energies),
-    ('Serving \nPlatform', improved_energies),
-    ('Hardware \n& Datacenter', hardware_energies)
-]:
-    # Use same data that's actually plotted (no additional filtering)
-    p5, p25, p50, p75, p95 = np.percentile(energies, [5, 25, 50, 75, 95])
-    mean = np.mean(energies)
-    std = np.std(energies)
-    
-    print(f"\n{category} (n = {len(energies):,} samples):")
-    print(f"  5th percentile: {p5:.3f} Wh")
-    print(f"  Q1 (25th): {p25:.3f} Wh")
-    print(f"  Median: {p50:.3f} Wh")
-    print(f"  Q3 (75th): {p75:.3f} Wh")
-    print(f"  95th percentile: {p95:.3f} Wh")
-    print(f"  Mean: {mean:.3f} Wh")
-    print(f"  Std Dev: {std:.3f} Wh")
-
-# Print improvement percentages relative to baseline (using same data as plotted)
-baseline_median = np.median(mixed_energies)
-
-print(f"\nImprovement vs Baseline (using same data as plotted):")
-print("="*30)
-for category, energies in [
-    ('Model', algorithm_energies),
-    ('Serving \nPlatform', improved_energies),
-    ('Hardware \n& Datacenter', hardware_energies)
-]:
-    improved_median = np.median(energies)
-    improvement_pct = (1 - improved_median/baseline_median) * 100
-    print(f"{category}: {improvement_pct:.1f}% reduction ({baseline_median:.3f} → {improved_median:.3f} Wh)")
-
-# %%
-
-# %%
-# === ADD THIS BLOCK after Figure 2 violin plot ===
-# %%
-# === HISTOGRAM BLOCK with KDE + per-plot normalization (0–1 density scale) ===
-
-# %%
-# === FINAL HISTOGRAM BLOCK: normalized 0–1 with in-figure annotations and "P5–P95" ===
-
-# %%
-# === FIXED TEXT POSITIONING VERSION ===
-
-plot_data_all.to_csv('manuscript_figures/updated_figures/figure2_energy_improvement_pathways_data.csv', index=False)
-print("Saved CSV: manuscript_figures/updated_figures/figure2_energy_improvement_pathways_data.csv")
-
-# plt.style.use('default')
-fig, axes = plt.subplots(4, 1, figsize=(10, 12), sharex=True)
-
-for ax, (category, color) in zip(axes, colors.items()):
-    subset = plot_data_all[plot_data_all['Distribution'] == category]['Energy (Wh)']
-
-    # Compute histogram manually for normalization
-    hist_values, bin_edges = np.histogram(subset, bins=50, density=True)
-    hist_values /= hist_values.max()  # normalize peak to 1
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    # Plot normalized histogram
-    ax.bar(bin_centers, hist_values, width=np.diff(bin_edges),
-           color=color, alpha=0.6, edgecolor='black', linewidth=0.4)
-
-    # Add KDE normalized to same 0–1 scale
-    sns.kdeplot(subset, color='black', linewidth=1.5, ax=ax)
-    kde_ymax = ax.lines[-1].get_ydata().max()
-    if kde_ymax > 0:
-        ax.lines[-1].set_ydata(ax.lines[-1].get_ydata() / kde_ymax)
-
-    # Compute stats
-    p5, p25, p50, p75, p95 = np.percentile(subset, [5, 25, 50, 75, 95])
-
-    # Median and IQR lines
-    ax.axvline(p50, color='white', linestyle='--', linewidth=2)
-    ax.axvline(p50, color='black', linestyle=':', linewidth=1.5)
-
-    # Annotation (shifted slightly inward and downward for better visual balance)
-    ax.text(0.6, 0.88,
-            f"{category} (P5–P95)\nMedian: {p50:.2f} Wh\nIQR: {p25:.2f}–{p75:.2f}",
-            transform=ax.transAxes,
-            fontsize=12,
-            verticalalignment='top',
-            bbox=dict(facecolor='white', alpha=0.8, edgecolor='none', boxstyle='round,pad=0.4'))
-
-    # Aesthetics
-    ax.grid(True, alpha=0.3)
-    ax.set_ylabel('')
-    ax.tick_params(axis='y', labelsize=11)
-    ax.set_ylim(0, 1.1)
-    ax.set_xlim(0, 2.5)
-
-fig.supylabel('Normalized Density (0–1)', fontsize=12)
-axes[-1].xaxis.set_major_locator(MaxNLocator(nbins=8))
-axes[-1].tick_params(axis='x', labelsize=11)
-plt.xlabel('Energy per Query (Wh)', fontsize=12)
-fig.tight_layout()
-fig.subplots_adjust(left=0.2)
-
-plt.savefig('manuscript_figures/updated_figures/figure2_energy_improvement_pathways_histograms.svg', format='svg', dpi=300, bbox_inches='tight', pad_inches=0.12)
-plt.savefig('manuscript_figures/updated_figures/figure2_energy_improvement_pathways_histograms.png', format='png', dpi=300, bbox_inches='tight', pad_inches=0.12)
-plt.show()
-
-# Figure 3: Token Length Distribution
-print("\n" + "="*60)
-print("FIGURE 3: TOKEN LENGTH DISTRIBUTION")
-print("="*60)
-
-print(f"Distribution parameters:")
-print(f"  Type: Exponential")
-print(f"  Median: {median_output_tokens} tokens")
-print(f"  Lambda parameter: {lambda_param:.6f}")
-print(f"  Number of samples: {n_runs:,}")
-
-# Generate a fresh sample for visualization (same parameters)
-np.random.seed(42)  # For reproducibility
-token_lengths_viz = np.round(np.random.exponential(1/lambda_param, n_runs)).astype(int)
-
-# Create Figure 3 - Token Length Distribution
-# plt.style.use('default')
-plt.figure(figsize=(12, 8), facecolor='white')
-
-# Create histogram with bins
-bins = np.arange(0, np.percentile(token_lengths_viz, 99) + 50, 50)  # 50-token bins up to 99th percentile
-plt.hist(token_lengths_viz, bins=bins, density=True, alpha=0.7, color='#3498db', 
-         edgecolor='black', linewidth=0.5, label=f'Histogram (n={n_runs:,})')
-
-# Add vertical lines for key statistics
-median_actual = np.median(token_lengths_viz)
-mean_actual = np.mean(token_lengths_viz)
-max_actual = np.max(token_lengths_viz)
-p25, p75 = np.percentile(token_lengths_viz, [25, 75])
-
-plt.axvline(median_actual, color='orange', linestyle='--', linewidth=2, 
-           label=f'Median: {median_actual:.0f} tokens (IQR:{p25:.0f}-{p75:.0f})')
-plt.axvline(mean_actual, color='red', linestyle=':', linewidth=2, 
-           label=f'Mean: {mean_actual:.0f} tokens')
-plt.axvline(max_actual, color='purple', linestyle='-.', linewidth=2, 
-           label=f'Max: {max_actual:,} tokens')
-
-# Customize the plot
-plt.title('Query Output Tokens \n(Exponential Distribution, P5-P95)', fontsize=14, pad=20)
-plt.xlabel('Output Tokens per Query', fontsize=8)
-plt.ylabel('Probability Density', fontsize=8)
-plt.grid(True, alpha=0.3)
-plt.legend(frameon=True, facecolor='white', edgecolor='none', fontsize=12)
-
-# Set reasonable x-axis limit to focus on the main distribution
-plt.xlim(25, np.percentile(token_lengths_viz, 95))
-
-# Increase font size of tick labels
-plt.xticks(fontsize=10)
-plt.yticks(fontsize=10)
-
-# Adjust layout
-plt.tight_layout()
-
-# Save the third figure
-plt.savefig('manuscript_figures/updated_figures/figure3_token_length_distribution.svg', format='svg', dpi=300, bbox_inches='tight')
-plt.savefig('manuscript_figures/updated_figures/figure3_token_length_distribution.png', format='png', dpi=300, bbox_inches='tight')
-
-# Show the plot
-plt.show()
-
-# Print statistics for token length distribution
-print(f"\nToken Length Distribution Statistics:")
-print("="*40)
-p5, p25, p50, p75, p95 = np.percentile(token_lengths_viz, [5, 25, 50, 75, 95])
-mean_tokens = np.mean(token_lengths_viz)
-std_tokens = np.std(token_lengths_viz)
-
-print(f"Sample size: {len(token_lengths_viz):,}")
-print(f"5th percentile: {p5:.0f} tokens")
-print(f"Q1 (25th): {p25:.0f} tokens")
-print(f"Median: {p50:.0f} tokens")
-print(f"Q3 (75th): {p75:.0f} tokens")
-print(f"95th percentile: {p95:.0f} tokens")
-print(f"Mean: {mean_tokens:.1f} tokens")
-print(f"Std Dev: {std_tokens:.1f} tokens")
-print(f"Max: {np.max(token_lengths_viz):,} tokens")
-print(f"Min: {np.min(token_lengths_viz)} tokens")
-
-# Theoretical vs Actual comparison
-theoretical_mean = 1/lambda_param
-theoretical_median = np.log(2)/lambda_param
-print(f"\nTheoretical vs Actual:")
-print(f"Mean - Theoretical: {theoretical_mean:.1f}, Actual: {mean_tokens:.1f}")
-print(f"Median - Theoretical: {theoretical_median:.1f}, Actual: {median_actual:.1f}")
-
-# %%
